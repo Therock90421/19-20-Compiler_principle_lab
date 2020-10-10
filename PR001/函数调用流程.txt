@@ -1,0 +1,84 @@
+gdb跟踪下的调用流程
+注：{}表示的是在哪个函数内又调用了哪个函数
+
+
+/home/clang7/lhc/llvm/tools/clang/lib/Lex/Pragma.cpp
+     void PragmaNamespace::HandlePragma(Preprocessor &PP, 
+                                   PragmaIntroducerKind Introducer,
+                                   Token &Tok)
+{
+    /home/clang7/lhc/llvm/tools/clang/include/clang/Lex/Preprocessor.h
+        void LexUnexpandedToken(Token &Result)
+        void Lex(Token &Result),选择case CLK_Lexer分支
+    {
+        /home/clang7/lhc/llvm/tools/clang/include/clang/Lex/Lexer.h
+            void Lex(Token &Result)
+          {
+                /home/clang7/lhc/llvm/tools/clang/include/clang/Lex/Token.h
+                    void startToken()
+ 
+                /home/clang7/lhc/llvm/tools/clang/lib/Lex/Lexer.cpp
+                    void Lexer::LexTokenInternal(Token &Result)
+          }
+     }
+    /home/clang7/lhc/llvm/tools/clang/lib/Lex/Pragma.cpp
+        clang::PragmaHandler *clang::PragmaNamespace::FindHandler(llvm::StringRef Name, bool IgnoreNull = true) const
+    （在这个调用的程序中识别了Handler为elementWise，并且接下来启动了对elementWise的操作）
+    /home/clang7/lhc/llvm/tools/clang/lib/Parse/ParsePragma.cpp
+        void PragmaElementWiseHandler::HandlePragma(Preprocessor &PP, 
+                                            PragmaIntroducerKind Introducer,
+                                            Token &ElementWiseTok)
+        {    
+             /home/clang7/lhc/llvm/tools/clang/lib/Lex/PPDirectives.cpp
+             void Preprocessor::CheckEndOfDirective(const char *DirType, bool EnableMacros)
+             （检查pragma elementWise的末尾）
+            
+             /home/clang7/lhc/llvm/lib/Support/Allocator.cpp
+             void *BumpPtrAllocator::Allocate(size_t Size, size_t Alignment)
+         
+            /home/clang7/lhc/llvm/tools/clang/include/clang/Lex/Token.h
+            class Token
+            （new 一个Token）
+
+           /home/clang7/lhc/llvm/tools/clang/include/clang/Lex/Token.h
+           void startToken()
+           （初始化Token）
+           void setKind(tok::TokenKind K) { Kind = K; }
+           （设置kind：Toks[0].setKind(tok::annot_pragma_elementWise);）
+           void setLocation(SourceLocation L) { Loc = L; }
+           （设置location：Toks[0].setLocation(ElementWiseTok.getLocation());）
+           void setAnnotationValue(void *val)
+           （因为elementWis没有特殊的值，所以设置为空即可：Toks[0].setAnnotationValue(NULL);）
+            
+           /home/clang7/lhc/llvm/tools/clang/lib/Lex/PPLexerChange.cpp
+           void Preprocessor::EnterTokenStream(const Token *Toks, unsigned NumToks,
+                                    bool DisableMacroExpansion,
+                                    bool OwnsTokens)
+           （具体怎么进行处理elementWise的过程都在这个调用下进行，不过太过庞大我没具体用gdb跟踪，只跟了几个重点函数）
+             {
+                    /home/clang7/lhc/llvm/tools/clang/lib/Parse/Parser.cpp
+                     Parser::ParseExternalDeclaration(ParsedAttributesWithRange &attrs,
+                                 ParsingDeclSpec *DS)
+                    （该函数通过tok的值是什么选择具体采用哪个Handle（case tok::annot_pragma_elementWise:
+                                                                                                       HandlePragmaElementWise();
+                                                                                                       return DeclGroupPtrTy();））
+
+                     /home/clang7/lhc/llvm/tools/clang/lib/Parse/ParsePragma.cpp
+                     void Parser::HandlePragmaElementWise()
+                     （该函数将Token通过ActOnPragmaElementWise()函数传递给Sema过程）
+                     {
+                            /home/clang7/lhc/llvm/tools/clang/lib/Sema/SemaAttr.cpp
+                            void Sema::ActOnPragmaElementWise() {
+                                                                             ElementWiseContext = 1;
+                                                                                             } 
+                            （对于语义分析，目前我们需要实现的elementWise的语义就是当出现#pragma elementWise时，就给其标注的函数打上一个印记，该印记相当于一个属性，可以被外接输入输出端口读取出，除此之外暂时没有其他语义。该函数实现目前我们要求的elementWise要求：将ElementWiseContext设置为1，以便后续识别）
+                     }
+                     
+                     /home/clang7/lhc/llvm/tools/clang/lib/Sema/SemaDecl.cpp
+                     Decl *Sema::ActOnFinishFunctionBody(Decl *dcl, Stmt *Body,
+                                    bool IsInstantiation)
+                     （该函数为预定义识别结束之后对函数体的设置。在此部分，需要增加实现elementWise的设置：如果ElementWiseContext为1，那么需要调用FD->setElementWise，将函数体的布尔变量IsElementWise设置为true，并将ElementWiseContext初始化为0，以供之后使用；否则不做处理）                                         
+             }
+            
+        }  
+}

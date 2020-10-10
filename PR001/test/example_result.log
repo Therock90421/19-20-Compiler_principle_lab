@@ -1,0 +1,19 @@
+wrong.c:
+are_you_ok: 0
+clang1_0: 1
+clang1_1: 0
+clang1_3: 1
+clang1_3xxx: 1
+clang1_clangt: 1
+clang1_whoops: 0
+clang1_x: 1
+clang1_xwhoops: 1
+i_am_fine: 0
+main: 0
+printf: 0
+
+right.c
+clang1_1: 1
+clang1_hello: 0
+main: 0
+printf: 0
