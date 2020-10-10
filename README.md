@@ -1,2 +1,5 @@
-# 19-20-Compiler_principle_lab
- 19-20Spring Compiler princilple experiment UCAS
+# 中国科学院大学 2019-2020春季学期 编译原理实验课
+
+基于llvm编译框架，对clang进行修改，实现了编译制导#pragma elementwise 
+
+代码与实验报告仅供参考，不可抄袭。若有引用请注明来源。
